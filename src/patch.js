@@ -1,6 +1,6 @@
-// const { Buffer } = require("buffer");
-// const path = require("path-browserify");
-// const { MemFs } from "./filesystem";
+// Set to true to use proxy module objects for debugging
+const debugModules = true;
+
 const console2 = new Promise((resolve, reject) => {
   if (typeof define === "function") {
     globalThis.define("console", () => {
@@ -50,7 +50,40 @@ const process = new Promise((resolve, reject) => {
 
 const fs = new Promise((resolve, reject) => {
   const { fs } = require("memfs");
-  globalThis.define("fs", () => fs);
+
+  function proxy() {
+    return new Proxy(fs, {
+      get(target, prop, receiver) {
+        const value = Reflect.get(target, prop, receiver);
+        if (typeof value === "function") {
+          return (...args) => {
+            console.log("ProxyFs", prop, "with", ...args);
+            if (prop === "writeSync") {
+              console.log("what are we even writing that's so big?");
+              console.log(args[1].toString());
+            }
+            try {
+              return value.apply(target, args);
+            } catch (e) {
+              if (typeof prop === "string" && e.name === "TypeError" && e.message === "callback must be a function") {
+                const syncProp = `${prop}Sync`;
+                if (Object.keys(target).includes(syncProp) && typeof target[syncProp] === "function") {
+                  return Reflect.get(target, syncProp, receiver).apply(target, args);
+                }
+              }
+              throw e;
+            }
+          };
+        }
+        return value;
+      },
+    });
+  }
+
+  const whichFs = debugModules ? proxy() : fs;
+  globalThis.fs = whichFs;
+
+  globalThis.define("fs", () => whichFs);
   globalThis.requirejs(["fs"], () => {
     resolve();
   });
@@ -66,23 +99,6 @@ const path = new Promise((resolve, reject) => {
 
 function emscripten() {
   return Promise.all([console2, process, fs, path]);
-  // globalThis.zorse_require = (mod) => {
-  //   switch (mod) {
-  //     case "console":
-  //     case "path":
-  //       return require("path-browserify");
-  //     case "process":
-  //       return process;
-  //     case "crypto":
-  //       return require("crypto-browserify");
-  //     case "fs":
-  //       return fs;
-  //     // case "busybox_unstripped.wasm":
-  //     //   return modules.busyBox.path;
-  //     default:
-  //       throw new Error(`${mod} is not defined`);
-  //   }
-  // };
 }
 
 module.exports = {

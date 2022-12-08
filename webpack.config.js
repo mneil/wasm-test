@@ -60,7 +60,7 @@ const webExtensionConfig = {
                 {
                   search: /^/,
                   // require buffer in zorse using webpack chunk id 1.
-                  replace: `const Buffer = (__webpack_require__(32).Buffer);\ndebugger;console.log(Buffer);\n`,
+                  replace: `const Buffer = (__webpack_require__(32).Buffer);`,
                 },
               ],
             },
