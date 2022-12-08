@@ -1,5 +1,4 @@
 const path = require("path");
-// const fs = require("fs");
 const webpack = require("webpack");
 const CopyPlugin = require("copy-webpack-plugin");
 
@@ -15,12 +14,16 @@ const webExtensionConfig = {
       name: "main",
       type: "amd",
     },
-    // umdNamedDefine: true,
   },
   devServer: {
-    static: {
-      directory: path.join(__dirname, "public"),
-    },
+    static: [
+      {
+        directory: path.join(__dirname, "public"),
+      },
+      {
+        directory: path.dirname(require.resolve("@zorse/drop")),
+      },
+    ],
     compress: true,
     port: 9000,
   },
@@ -34,47 +37,36 @@ const webExtensionConfig = {
       // Webpack 5 no longer polyfills Node.js core modules automatically.
       // see https://webpack.js.org/configuration/resolve/#resolvefallback
       // for the list of Node.js core module polyfills.
-      // assert: require.resolve("assert"),
-      // stream: require.resolve("stream-browserify"),
-      // path: require.resolve("path-browserify"),
+      assert: require.resolve("assert"),
+      stream: require.resolve("stream-browserify"),
+      path: require.resolve("path-browserify"),
       // url: require.resolve("url/"),
     },
   },
   module: {
-    noParse: /(@zorse\/drop|requirejs)/,
+    noParse: /(@zorse\/drop)/,
     rules: [
-      // {
-      //   test: /\.wasm$/,
-      //   type: "asset/resource",
-      //   generator: {
-      //     outputPath: "drop/",
-      //   },
-      // },
-      // {
-      //   test: /node_modules\/@zorse\/drop\/lib\.js$/,
-      //   use: [
-      //     {
-      //       loader: "string-replace-loader",
-      //       options: {
-      //         multiple: [
-      //           {
-      //             search: /require\(/g,
-      //             replace: "zorse_require(",
-      //           },
-      //           {
-      //             search: /^/,
-      //             // require buffer in zorse using webpack chunk id 1.
-      //             replace: `const Buffer = __webpack_require__(1).Buffer;\n`,
-      //           },
-      //           {
-      //             search: `ie(Z="busybox_unstripped.wasm")||(J=Z,Z=e.locateFile?e.locateFile(J,g):g+J);`,
-      //             replace: `Z=zorse_require("busybox_unstripped.wasm");`,
-      //           },
-      //         ],
-      //       },
-      //     },
-      //   ],
-      // },
+      {
+        test: /node_modules\/@zorse\/drop\/lib\.js$/,
+        use: [
+          {
+            loader: "string-replace-loader",
+            options: {
+              multiple: [
+                {
+                  search: /__dirname/g,
+                  replace: "''",
+                },
+                {
+                  search: /^/,
+                  // require buffer in zorse using webpack chunk id 1.
+                  replace: `const Buffer = (__webpack_require__(32).Buffer);\ndebugger;console.log(Buffer);\n`,
+                },
+              ],
+            },
+          },
+        ],
+      },
     ],
   },
   plugins: [
@@ -84,11 +76,11 @@ const webExtensionConfig = {
     new webpack.optimize.LimitChunkCountPlugin({
       maxChunks: 1, // disable chunks by default since web extensions must be a single bundle
     }),
-    // new webpack.ProvidePlugin({
-    //   process: "process/browser", // provide a shim for the global `process` variable
-    //   // eslint-disable-next-line @typescript-eslint/naming-convention
-    //   Buffer: path.resolve("webpack", "buffer.js"),
-    // }),
+    // shim globals
+    new webpack.ProvidePlugin({
+      process: "process/browser",
+      Buffer: path.resolve("webpack", "buffer.js"),
+    }),
   ],
   performance: {
     hints: false,
